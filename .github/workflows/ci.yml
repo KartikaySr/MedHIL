@@ -1,0 +1,34 @@
+name: MedHIL verification
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        mode: [Debug, Release]
+        compiler: [default, clang]
+        exclude:
+          - os: macos-latest
+            compiler: clang
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Ubuntu Clang
+        if: matrix.compiler == 'clang'
+        run: echo "CXX=clang++" >> "$GITHUB_ENV"
+      - name: Configure
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.mode }}
+          -DCMAKE_CXX_FLAGS_DEBUG="-O1 -g"
+          -DMEDHIL_ENABLE_SANITIZERS=${{ matrix.mode == 'Debug' && 'ON' || 'OFF' }}
+      - run: cmake --build build --parallel 2
+      - run: ctest --test-dir build --output-on-failure
+      - name: Exercise command line scenarios
+        if: matrix.mode == 'Release'
+        run: |
+          for scenario in nominal occlusion_fault fixture_violation stale_tracker force_overload joint_limit hardware_fault monte_carlo; do
+            ./build/medhil_cli --scenario "$scenario" --seed 42
+          done

@@ -1,0 +1,6 @@
+/build*/
+/references/
+*.zip
+*.csv
+.DS_Store
+compile_commands.json
